@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 766" width="1100" height="766" font-family="Helvetica, Arial, sans-serif">
+<style>.rel{fill:none;stroke:#5b6475;stroke-width:1.4}.card{font-size:12px;font-weight:bold;fill:#b42318}.col{font-size:12px;fill:#1f2430}.key{font-size:9.5px;font-weight:bold;fill:#3157a4}.title{font-size:13px;font-weight:bold;fill:#fff}</style>
+<rect width="1100" height="766" fill="#fff"/>
+<path d="M 130 118 L 130 200" class="rel"/><text x="137.0" y="135" class="card" text-anchor="middle">1</text><text x="137.0" y="191" class="card" text-anchor="middle">N</text>
+<path d="M 130 298 L 130 500" class="rel"/><text x="137.0" y="315" class="card" text-anchor="middle">1</text><text x="137.0" y="491" class="card" text-anchor="middle">N</text>
+<path d="M 240 269 L 300 269" class="rel"/><text x="251" y="264.6" class="card" text-anchor="middle">1</text><text x="289" y="264.6" class="card" text-anchor="middle">N</text>
+<path d="M 410 134 L 410 200" class="rel"/><text x="417.0" y="151" class="card" text-anchor="middle">1</text><text x="417.0" y="191" class="card" text-anchor="middle">N</text>
+<path d="M 520 218 L 540 218 L 540 81 L 580 81" class="rel"/><text x="531" y="213.52" class="card" text-anchor="middle">1</text><text x="569" y="77.0" class="card" text-anchor="middle">N</text>
+<path d="M 520 295 L 860 295" class="rel"/><text x="531" y="290.9" class="card" text-anchor="middle">1</text><text x="849" y="290.9" class="card" text-anchor="middle">N</text>
+<path d="M 970 118 L 970 180" class="rel"/><text x="977.0" y="135" class="card" text-anchor="middle">1</text><text x="977.0" y="171" class="card" text-anchor="middle">N</text>
+<path d="M 410 346 L 410 500" class="rel"/><text x="417.0" y="363" class="card" text-anchor="middle">1</text><text x="417.0" y="491" class="card" text-anchor="middle">N</text>
+<path d="M 240 546 L 300 546" class="rel"/><text x="251" y="541.6" class="card" text-anchor="middle">1</text><text x="289" y="541.6" class="card" text-anchor="middle">N</text>
+<path d="M 580 539 L 520 539" class="rel"/><text x="569" y="535.2" class="card" text-anchor="middle">1</text><text x="531" y="535.2" class="card" text-anchor="middle">0..1</text>
+<path d="M 860 318 L 690 318 L 690 500" class="rel"/><text x="849" y="313.7" class="card" text-anchor="middle">1</text><text x="697" y="491" class="card" text-anchor="middle">N</text>
+<path d="M 130 614 L 130 640 L 690 640 L 690 598" class="rel"/><text x="137.0" y="631" class="card" text-anchor="middle">1</text><text x="697.0" y="615" class="card" text-anchor="middle">N</text>
+<path d="M 970 342 L 970 400" class="rel"/><text x="977.0" y="359" class="card" text-anchor="middle">1</text><text x="977.0" y="391" class="card" text-anchor="middle">N</text>
+<path d="M 970 546 L 970 600" class="rel"/><text x="977.0" y="563" class="card" text-anchor="middle">1</text><text x="977.0" y="591" class="card" text-anchor="middle">N</text>
+<rect x="20" y="20" width="220" height="98" rx="5" fill="#fbfcfe" stroke="#2d3a55" stroke-width="1.4"/>
+<rect x="20" y="20" width="220" height="26" rx="5" fill="#2d3a55"/>
+<text x="130.0" y="37" class="title" text-anchor="middle">theatre</text>
+<text x="28" y="62" class="key">PK</text>
+<text x="66" y="62" class="col">theatre_id</text>
+<text x="66" y="78" class="col">name</text>
+<text x="66" y="94" class="col">city</text>
+<text x="66" y="110" class="col">address</text>
+<rect x="20" y="200" width="220" height="98" rx="5" fill="#fbfcfe" stroke="#2d3a55" stroke-width="1.4"/>
+<rect x="20" y="200" width="220" height="26" rx="5" fill="#2d3a55"/>
+<text x="130.0" y="217" class="title" text-anchor="middle">screen</text>
+<text x="28" y="242" class="key">PK</text>
+<text x="66" y="242" class="col">screen_id</text>
+<text x="28" y="258" class="key">FK</text>
+<text x="66" y="258" class="col">theatre_id</text>
+<text x="66" y="274" class="col">name</text>
+<text x="66" y="290" class="col">screen_type</text>
+<rect x="20" y="500" width="220" height="114" rx="5" fill="#fbfcfe" stroke="#2d3a55" stroke-width="1.4"/>
+<rect x="20" y="500" width="220" height="26" rx="5" fill="#2d3a55"/>
+<text x="130.0" y="517" class="title" text-anchor="middle">seat</text>
+<text x="28" y="542" class="key">PK</text>
+<text x="66" y="542" class="col">seat_id</text>
+<text x="28" y="558" class="key">FK</text>
+<text x="66" y="558" class="col">screen_id</text>
+<text x="66" y="574" class="col">row_label</text>
+<text x="66" y="590" class="col">seat_number</text>
+<text x="66" y="606" class="col">category</text>
+<rect x="300" y="20" width="220" height="114" rx="5" fill="#fbfcfe" stroke="#2d3a55" stroke-width="1.4"/>
+<rect x="300" y="20" width="220" height="26" rx="5" fill="#2d3a55"/>
+<text x="410.0" y="37" class="title" text-anchor="middle">movie</text>
+<text x="308" y="62" class="key">PK</text>
+<text x="346" y="62" class="col">movie_id</text>
+<text x="346" y="78" class="col">title</text>
+<text x="346" y="94" class="col">duration_min</text>
+<text x="346" y="110" class="col">certificate</text>
+<text x="346" y="126" class="col">release_date</text>
+<rect x="300" y="200" width="220" height="146" rx="5" fill="#fbfcfe" stroke="#2d3a55" stroke-width="1.4"/>
+<rect x="300" y="200" width="220" height="26" rx="5" fill="#2d3a55"/>
+<text x="410.0" y="217" class="title" text-anchor="middle">movie_show</text>
+<text x="308" y="242" class="key">PK</text>
+<text x="346" y="242" class="col">show_id</text>
+<text x="308" y="258" class="key">FK</text>
+<text x="346" y="258" class="col">screen_id</text>
+<text x="308" y="274" class="key">FK</text>
+<text x="346" y="274" class="col">movie_id</text>
+<text x="346" y="290" class="col">language</text>
+<text x="346" y="306" class="col">format</text>
+<text x="346" y="322" class="col">show_date</text>
+<text x="346" y="338" class="col">start_time</text>
+<rect x="580" y="40" width="220" height="82" rx="5" fill="#fbfcfe" stroke="#2d3a55" stroke-width="1.4"/>
+<rect x="580" y="40" width="220" height="26" rx="5" fill="#2d3a55"/>
+<text x="690.0" y="57" class="title" text-anchor="middle">show_price</text>
+<text x="588" y="82" class="key">PK FK</text>
+<text x="626" y="82" class="col">show_id</text>
+<text x="588" y="98" class="key">PK</text>
+<text x="626" y="98" class="col">category</text>
+<text x="626" y="114" class="col">price</text>
+<rect x="860" y="20" width="220" height="98" rx="5" fill="#fbfcfe" stroke="#2d3a55" stroke-width="1.4"/>
+<rect x="860" y="20" width="220" height="26" rx="5" fill="#2d3a55"/>
+<text x="970.0" y="37" class="title" text-anchor="middle">customer</text>
+<text x="868" y="62" class="key">PK</text>
+<text x="906" y="62" class="col">customer_id</text>
+<text x="906" y="78" class="col">name</text>
+<text x="906" y="94" class="col">email (unique)</text>
+<text x="906" y="110" class="col">phone (unique)</text>
+<rect x="860" y="180" width="220" height="162" rx="5" fill="#fbfcfe" stroke="#2d3a55" stroke-width="1.4"/>
+<rect x="860" y="180" width="220" height="26" rx="5" fill="#2d3a55"/>
+<text x="970.0" y="197" class="title" text-anchor="middle">booking</text>
+<text x="868" y="222" class="key">PK</text>
+<text x="906" y="222" class="col">booking_id</text>
+<text x="868" y="238" class="key">FK</text>
+<text x="906" y="238" class="col">customer_id</text>
+<text x="868" y="254" class="key">FK</text>
+<text x="906" y="254" class="col">show_id</text>
+<text x="906" y="270" class="col">status</text>
+<text x="906" y="286" class="col">idempotency_key (unique)</text>
+<text x="906" y="302" class="col">created_at</text>
+<text x="906" y="318" class="col">expires_at</text>
+<text x="906" y="334" class="col">confirmed_at</text>
+<rect x="300" y="500" width="220" height="98" rx="5" fill="#fbfcfe" stroke="#b42318" stroke-width="1.4"/>
+<rect x="300" y="500" width="220" height="26" rx="5" fill="#b42318"/>
+<text x="410.0" y="517" class="title" text-anchor="middle">show_seat</text>
+<text x="308" y="542" class="key">PK FK</text>
+<text x="346" y="542" class="col">show_id</text>
+<text x="308" y="558" class="key">PK FK</text>
+<text x="346" y="558" class="col">seat_id</text>
+<text x="308" y="574" class="key">FK</text>
+<text x="346" y="574" class="col">booking_seat_id (unique)</text>
+<text x="346" y="590" class="col">version</text>
+<rect x="580" y="500" width="220" height="98" rx="5" fill="#fbfcfe" stroke="#2d3a55" stroke-width="1.4"/>
+<rect x="580" y="500" width="220" height="26" rx="5" fill="#2d3a55"/>
+<text x="690.0" y="517" class="title" text-anchor="middle">booking_seat</text>
+<text x="588" y="542" class="key">PK</text>
+<text x="626" y="542" class="col">booking_seat_id</text>
+<text x="588" y="558" class="key">FK</text>
+<text x="626" y="558" class="col">booking_id</text>
+<text x="588" y="574" class="key">FK</text>
+<text x="626" y="574" class="col">seat_id</text>
+<text x="626" y="590" class="col">price_paid</text>
+<rect x="860" y="400" width="220" height="146" rx="5" fill="#fbfcfe" stroke="#2d3a55" stroke-width="1.4"/>
+<rect x="860" y="400" width="220" height="26" rx="5" fill="#2d3a55"/>
+<text x="970.0" y="417" class="title" text-anchor="middle">payment</text>
+<text x="868" y="442" class="key">PK</text>
+<text x="906" y="442" class="col">payment_id</text>
+<text x="868" y="458" class="key">FK</text>
+<text x="906" y="458" class="col">booking_id</text>
+<text x="906" y="474" class="col">provider</text>
+<text x="906" y="490" class="col">provider_payment_id</text>
+<text x="906" y="506" class="col">amount</text>
+<text x="906" y="522" class="col">status</text>
+<text x="906" y="538" class="col">created_at</text>
+<rect x="860" y="600" width="220" height="146" rx="5" fill="#fbfcfe" stroke="#2d3a55" stroke-width="1.4"/>
+<rect x="860" y="600" width="220" height="26" rx="5" fill="#2d3a55"/>
+<text x="970.0" y="617" class="title" text-anchor="middle">webhook_event</text>
+<text x="868" y="642" class="key">PK</text>
+<text x="906" y="642" class="col">provider</text>
+<text x="868" y="658" class="key">PK</text>
+<text x="906" y="658" class="col">provider_event_id</text>
+<text x="868" y="674" class="key">FK</text>
+<text x="906" y="674" class="col">provider_payment_id</text>
+<text x="906" y="690" class="col">event_type</text>
+<text x="906" y="706" class="col">payload</text>
+<text x="906" y="722" class="col">received_at</text>
+<text x="906" y="738" class="col">processed_at</text>
+</svg>
