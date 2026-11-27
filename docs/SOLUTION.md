@@ -14,9 +14,10 @@ The flow: a user opens a theatre, picks one of the next 7 dates, sees the movies
 | 2 | A seat's category (Silver, Gold, Recliner) is set **per seat**. One row may mix categories (row B in the sample data does). |
 | 3 | Price depends on the show and the seat category. A single currency (INR) is used. |
 | 4 | `address` is a free-text street line. It does not determine the city. |
-| 5 | `show_date` and `start_time` are the theatre's local time. |
+| 5 | All theatres are in India: `show_date` and `start_time` are IST (UTC+05:30). Every `DATETIME` column holds UTC, so session and server time zones have no effect. Supporting other countries would need a time zone per theatre. |
 | 6 | The application verifies the webhook signature before calling the database. |
-| 7 | A booking covers one show and 1 to 10 seats. |
+| 7 | A booking covers one show and 1 to 10 seats, and can be made only before the show starts. |
+| 8 | Refunds are for the full amount of a charge. |
 
 ## 2. Entities and relationships
 
@@ -39,6 +40,8 @@ The flow: a user opens a theatre, picks one of the next 7 dates, sees the movies
 
 ## 3. Why these 12 tables
 
+The schema has 12 tables, and every one of them passes the test below.
+
 ### 3.1 The test every table must pass
 
 A table is kept only if it meets at least one of these:
@@ -47,37 +50,7 @@ A table is kept only if it meets at least one of these:
 - **N (normal form):** without it some dependency breaks 2NF, 3NF or BCNF.
 - **C (concurrency):** it carries a guarantee the brief asks for: no double booking, timed holds that are not lost, idempotent webhooks.
 
-A lookup table for a single value (city name, language, format, category) is **not required by any normal form**: a column value is not a functional dependency. Where the set of values is small and stable, `ENUM` or `CHECK` gives the same validation without a join.
-
-### 3.2 Candidate table lists
-
-| Variation | Tables |
-|---|---|
-| **V1 Bare minimum (7)** | theatre, screen, movie, movie_show, customer, booking, booking_seat |
-| **V2 Lean (9)** | V1 without booking_seat, plus seat, show_seat, payment |
-| **V3 Chosen (12)** | V2 plus show_price, booking_seat, webhook_event |
-| **V4 Full lookups (17)** | V3 plus city, seat_category, language, format, movie_language |
-
-| Requirement | V1 | V2 | **V3** | V4 |
-|---|---|---|---|---|
-| List shows by date with timings | Yes | Yes | **Yes** | Yes, with more joins |
-| Seats validated against a real layout | No, free text | Yes | **Yes** | Yes |
-| No double booking | Only by copying `show_id` into booking_seat | Yes | **Yes** | Yes |
-| Price per seat category | No | No | **Yes** | Yes |
-| Expired or cancelled bookings remember their seats | Only if rows are never deleted, which blocks resale | No | **Yes** | Yes |
-| Webhook de-duplication and audit | No | Status checks only | **Yes** | Yes |
-| BCNF | No | No | **Yes** | Yes |
-| Tables that pass none of E, N, C | 0 | 0 | **0** | 5 |
-
-**V1 is too small.** Without a seat inventory, the only way to stop double booking is `UNIQUE(show_id, seat_label)` on booking_seat. That needs `show_id` in booking_seat although the booking already determines it (`booking_id -> show_id`), which breaks BCNF. The unique key also blocks resale after an expiry unless history is deleted. There is nowhere to record payments.
-
-**V2 is still too small.** Dropping booking_seat leaves `show_seat.booking_id` as the only link between a booking and its seats. In that table `booking_id -> show_id` holds while `booking_id` is not a key, so it is in 3NF but **not BCNF**. When a hold expires the link is cleared and the booking no longer knows what it held, so a late payment cannot be honoured. There is one price per show and no event de-duplication.
-
-**V4 is too big.** All five extra tables are single-value lookups. They add joins to the theatre page, which is the most frequent read, and remove no redundancy that `ENUM` or `CHECK` leaves behind. Add them when a feature needs them: `city` for city selection with state or time zone, `language` and `seat_category` when administrators must manage the lists at run time.
-
-**V3 is the smallest list that meets every requirement and stays in BCNF.**
-
-### 3.3 Justification of each table
+### 3.2 The 12 tables
 
 | Table | Test | Why it cannot be merged away |
 |---|---|---|
@@ -94,7 +67,7 @@ A lookup table for a single value (city name, language, format, category) is **n
 | payment | E | A booking can have several attempts (fail, retry, succeed), so these cannot be columns of booking. |
 | webhook_event | C | The primary key on the provider's event id rejects repeat deliveries, including ones that change no status, and keeps the raw payload. |
 
-### 3.4 Design choices inside the table list
+### 3.3 Design choices inside the tables
 
 **How should show_seat point at its owner?**
 
@@ -102,15 +75,15 @@ A lookup table for a single value (city name, language, format, category) is **n
 |---|---|
 | A `status` column (`FREE`, `HELD`, `BOOKED`) | Duplicates `booking.status`; the two can disagree. Rejected. |
 | `booking_id` | Simple, but `booking_id -> show_id` makes the table fail BCNF. Rejected. |
-| **`booking_seat_id`, unique** | The determinant is a key of the table, so it is in BCNF. A composite foreign key also proves that the owner is for the same seat. **Chosen.** |
+| **`booking_seat_id`, unique** | The determinant is unique wherever it has a value, so it acts as a key and the table satisfies BCNF. A composite foreign key also proves that the owner is for the same seat. **Chosen.** |
 
-The cost of the chosen option is one extra join to read a seat's status, and one rule the schema cannot declare: the owner's booking must be for the same show. The procedures guarantee it and an invariant query checks it.
+The cost of the chosen option is one extra join to read a seat's status, and one rule the schema cannot declare: the owner's booking must be for the same show. In other words, the link between a claim and its show now spans two tables, where normal forms do not apply, instead of sitting inside one. The procedures guarantee it and an invariant query checks it.
 
 **Why create inventory rows in advance?** The alternative inserts a row only when a seat is taken and relies on a unique key. It saves space, but there is no row to lock beforehand, `SKIP LOCKED` cannot pick free seats, and counting free seats needs an anti-join. Pre-created rows cost storage (seats x shows), which is handled by archiving past shows.
 
 ## 4. Table structures and sample rows
 
-Sample rows are query output from `02_seed.sql`. Dates are relative to the day the script runs (here 2026-11-27). Types such as `INT UNSIGNED` are abbreviated to `INT`; exact definitions are in the P1 SQL.
+Sample rows are query output from `02_seed.sql`. Dates are relative to the day the script runs in India (here 2026-11-27); times in `DATETIME` columns are UTC. Types such as `INT UNSIGNED` are abbreviated to `INT`; exact definitions are in the P1 SQL.
 
 ### 4.1 theatre
 
@@ -205,10 +178,10 @@ Sample rows are query output from `02_seed.sql`. Dates are relative to the day t
 
 | show_id | category | price |
 |---|---|---|
-| 3 | SILVER | 220.00 |
-| 3 | GOLD | 290.00 |
-| 3 | RECLINER | 490.00 |
-| 5 | SILVER | 330.00 |
+| 14 | SILVER | 220.00 |
+| 14 | GOLD | 290.00 |
+| 14 | RECLINER | 490.00 |
+| 16 | SILVER | 330.00 |
 
 ### 4.7 customer
 
@@ -234,15 +207,15 @@ Sample rows are query output from `02_seed.sql`. Dates are relative to the day t
 | show_id | INT | FK movie_show |
 | status | ENUM | PENDING, CONFIRMED, EXPIRED, CANCELLED |
 | idempotency_key | CHAR(36) | unique |
-| created_at | DATETIME(3) | default now |
-| expires_at | DATETIME(3) | end of the hold |
+| created_at | DATETIME(3) | UTC, default now |
+| expires_at | DATETIME(3) | UTC end of the hold |
 | confirmed_at | DATETIME(3) | NULL until confirmed |
 
 | booking_id | customer_id | show_id | status | idempotency_key (ending) | expires_at | confirmed_at |
 |---|---|---|---|---|---|---|
-| 1 | 1 | 3 | CONFIRMED | ...000000000001 | 12:30:43 | 12:23:43 |
-| 2 | 2 | 3 | PENDING | ...000000000002 | 13:30:43 | NULL |
-| 3 | 3 | 3 | EXPIRED | ...000000000003 | 13:00:43 | NULL |
+| 1 | 1 | 14 | CONFIRMED | ...000000000001 | 12:30:43 | 12:23:43 |
+| 2 | 2 | 14 | PENDING | ...000000000002 | 13:30:43 | NULL |
+| 3 | 3 | 14 | EXPIRED | ...000000000003 | 13:00:43 | NULL |
 
 ### 4.9 booking_seat
 
@@ -272,11 +245,11 @@ Sample rows are query output from `02_seed.sql`. Dates are relative to the day t
 
 | show_id | seat_id | booking_seat_id | version | Meaning |
 |---|---|---|---|---|
-| 3 | 1 | NULL | 0 | free (booking 3 expired) |
-| 3 | 8 | 1 | 1 | booked (booking 1) |
-| 3 | 9 | 2 | 1 | booked (booking 1) |
-| 3 | 10 | NULL | 0 | free |
-| 3 | 13 | 3 | 1 | held (booking 2) |
+| 14 | 1 | NULL | 0 | free (booking 3 expired) |
+| 14 | 8 | 1 | 1 | booked (booking 1) |
+| 14 | 9 | 2 | 1 | booked (booking 1) |
+| 14 | 10 | NULL | 0 | free |
+| 14 | 13 | 3 | 1 | held (booking 2) |
 
 ### 4.11 payment
 
@@ -288,7 +261,7 @@ Sample rows are query output from `02_seed.sql`. Dates are relative to the day t
 | provider_payment_id | VARCHAR(100) | the provider's reference |
 | amount | DECIMAL(10,2) | amount the provider reported |
 | status | ENUM | INITIATED, SUCCEEDED, FAILED, REFUND_PENDING, REFUNDED |
-| created_at | DATETIME(3) | default now |
+| created_at | DATETIME(3) | UTC, default now |
 
 | payment_id | booking_id | provider | provider_payment_id | amount | status |
 |---|---|---|---|---|---|
@@ -304,7 +277,7 @@ Sample rows are query output from `02_seed.sql`. Dates are relative to the day t
 | provider_payment_id | VARCHAR(100) | FK (provider, provider_payment_id) to payment |
 | event_type | VARCHAR(50) | NOT NULL |
 | payload | JSON | raw message, for audit |
-| received_at | DATETIME(3) | default now |
+| received_at | DATETIME(3) | UTC, default now |
 | processed_at | DATETIME(3) | set when applied |
 
 | provider | provider_event_id | provider_payment_id | event_type | payload |
@@ -320,6 +293,8 @@ Sample rows are query output from `02_seed.sql`. Dates are relative to the day t
 
 **3NF and BCNF.** In every table, the left side of every non-trivial functional dependency is a candidate key.
 
+One qualification: `show_seat.booking_seat_id` can be NULL, and classical theory does not allow NULL in a candidate key. It is unique among the rows that have a value (the claimed seats), and the BCNF statement for `show_seat` relies on that reading. Normal forms judge one table at a time, so rules that span tables are listed in section 10.
+
 | Table | Candidate keys | Functional dependencies | BCNF |
 |---|---|---|---|
 | theatre | theatre_id; (city, name) | key -> address and the other key | Yes |
@@ -331,7 +306,7 @@ Sample rows are query output from `02_seed.sql`. Dates are relative to the day t
 | customer | customer_id; email; phone | key -> name | Yes |
 | booking | booking_id; idempotency_key | key -> customer_id, show_id, status, times | Yes |
 | booking_seat | booking_seat_id; (booking_id, seat_id) | key -> price_paid | Yes |
-| show_seat | (show_id, seat_id); booking_seat_id when not NULL | key -> version, owner | Yes |
+| show_seat | (show_id, seat_id); booking_seat_id (claimed rows) | key -> version, owner | Yes |
 | payment | payment_id; (provider, provider_payment_id) | key -> booking_id, amount, status | Yes |
 | webhook_event | (provider, provider_event_id) | key -> provider_payment_id, event_type, payload, times | Yes |
 
@@ -361,8 +336,8 @@ Dependencies that look possible but do not hold:
 | (new) | hold succeeds | PENDING | seats claimed for 10 minutes |
 | PENDING | payment succeeds | CONFIRMED | unchanged |
 | PENDING | timer runs out | EXPIRED | seats released |
-| EXPIRED | late payment, all seats still free | CONFIRMED | seats claimed again |
-| EXPIRED | late payment, a seat resold | EXPIRED, payment REFUND_PENDING | unchanged |
+| EXPIRED | late payment, all seats still free, show not started | CONFIRMED | seats claimed again |
+| EXPIRED | late payment, a seat resold or show started | EXPIRED, payment REFUND_PENDING | unchanged |
 | CONFIRMED | paying charge refunded | CANCELLED | seats released |
 
 ### 6.2 Two layers
@@ -398,7 +373,7 @@ return 1
 
 ### 6.4 Taking a hold (implemented: `sp_hold_seats`)
 
-In one `READ COMMITTED` transaction: insert the booking, insert its booking_seat rows with current prices, then claim the inventory:
+The procedure first checks that the request is an array of 1 to 10 positive integers, then releases any timed-out holds on this show. Then, in one `READ COMMITTED` transaction: check that the show has not started (`SHOW_CLOSED`), insert the booking, insert its booking_seat rows with current prices, then claim the inventory:
 
 ```sql
 UPDATE booking_seat bs
@@ -418,6 +393,8 @@ If the number of rows changed differs from the number of seats requested, the wh
 
 **Client retries:** the unique `idempotency_key` makes a repeated request return the original booking.
 
+**Caller transactions:** each procedure owns its transaction. The caller must have none open (with autocommit off, commit first). Otherwise the call fails with error 1568 and the caller's pending work is neither committed nor rolled back.
+
 ### 6.5 Pessimistic or optimistic?
 
 | Strategy | How it works | Under heavy contention | Verdict |
@@ -432,7 +409,7 @@ The chosen statement is optimistic in style (no earlier read lock) while InnoDB'
 
 ### 6.6 Timed release (implemented: `sp_expire_holds`, `ev_expire_holds`)
 
-A MySQL event runs every 30 seconds. It selects `PENDING` bookings past `expires_at` with `FOR UPDATE SKIP LOCKED`, frees their seats and marks them `EXPIRED`. Several workers can run it safely. A seat can stay unavailable up to 30 seconds after the timer ends. At production scale, run it from application workers every few seconds and repeat until a batch comes back empty.
+The sweeper selects `PENDING` bookings past `expires_at` with `FOR UPDATE SKIP LOCKED`, frees their seats and marks them `EXPIRED`. It runs from a MySQL event every 30 seconds, and `sp_hold_seats` also calls it for the requested show, so a timed-out seat can be held again at once. Several callers can run it safely. All times are compared in UTC. At production scale, run it from application workers every few seconds and repeat until a batch comes back empty.
 
 **Why no hold is lost:** the hold is a committed row, so it survives restarts (with `innodb_flush_log_at_trx_commit = 1`, the default). Expiry is derived from stored data, not from a timer in memory. booking_seat is never deleted, so every booking still knows its seats.
 
@@ -441,20 +418,23 @@ A MySQL event runs every 30 seconds. It selects `PENDING` bookings past `expires
 1. Insert into `webhook_event`. A duplicate key means the event was already handled: return success without changes. A simultaneous duplicate waits for the first transaction, then gets the same error.
 2. Lock the booking row, which serialises the webhook against the sweeper.
 3. Find or create the payment on `(provider, provider_payment_id)`.
-4. Apply the event. Statuses only move forward, so late or reordered events do no harm.
+4. Apply the event. A payment moves from INITIATED to FAILED; from INITIATED or FAILED to SUCCEEDED or REFUND_PENDING; and from SUCCEEDED or REFUND_PENDING to REFUNDED. Event types the procedure does not handle are recorded without creating a payment.
 5. Commit. A crash before this leaves no trace, and the provider's retry is processed normally.
 
 | Situation | Result |
 |---|---|
 | Success, booking pending | CONFIRMED |
-| Success, hold expired, seats free | CONFIRMED_LATE |
-| Success, hold expired, seat resold | REFUND_REQUIRED |
+| Success, hold expired, seats free, show not started | CONFIRMED_LATE |
+| Success, hold expired, seat resold or show started | REFUND_REQUIRED |
 | Success, booking already confirmed by another charge, or cancelled | REFUND_REQUIRED |
 | Success with the wrong amount | AMOUNT_MISMATCH (marked for refund) |
 | Same event id again | DUPLICATE_EVENT |
 | New event id for an already applied payment | ALREADY_APPLIED |
 | Failure | PAYMENT_FAILED; the hold stays so the customer can retry |
-| Refund of the paying charge | REFUNDED; booking cancelled, seats freed |
+| Full refund of the paying charge | REFUNDED; booking cancelled, seats freed |
+| Partial refund | PARTIAL_REFUND; recorded, nothing else changes |
+| Refund before its success event | OUT_OF_ORDER; nothing recorded, so the redelivery applies it |
+| Unhandled event type | IGNORED |
 | Unknown booking | UNKNOWN_BOOKING; nothing recorded, so a retry is possible |
 
 `REFUND_PENDING` rows are the work list for a refund job, which is outside this assignment.
@@ -469,7 +449,7 @@ A MySQL event runs every 30 seconds. It selects `PENDING` bookings past `expires
 | Shows of a screen on a date, by time | `uq_show_slot (screen_id, show_date, start_time)` |
 | Claim seats | primary key `show_seat (show_id, seat_id)` |
 | Release a booking's seats | `uq_booking_seat`, then `uq_show_seat_owner` |
-| Find expired holds | `idx_booking_expiry (status, expires_at)` |
+| Find expired holds | `idx_booking_expiry (status, expires_at)`, or `idx_booking_show` for one show |
 | Webhook de-duplication | primary key of `webhook_event` |
 | Find a payment | `uq_payment_provider_ref` |
 
@@ -492,39 +472,42 @@ Tool: k6 against an API built on these procedures, with production-like data vol
 | Spike on one show | 0 to 5,000 users in 10 s, random 2-seat holds | no seat owned twice; p95 under 500 ms; no 5xx |
 | Same seat | 1,000 users, one seat | exactly one success |
 | Webhook storm | each event sent 10 times, out of order | one state change per event |
-| Abandonment | 70% of holds never paid | all released within expiry + 30 s |
+| Abandonment | 70% of holds never paid | all released within expiry + 30 s, or on the next hold |
 | Kill an app node and Redis during the spike | fault injection | invariants still hold |
 
 After every run these must return zero rows: a seat in two active bookings; an active booking missing a seat; an inactive booking still owning a seat; a `SUCCEEDED` payment whose booking is not `CONFIRMED`.
 
 ## 8. P2: shows on a date at a theatre
 
-Set the theatre and date, then run `sql/03_p2_shows_by_date.sql`.
+Set the theatre and date, then run `sql/03_p2_shows_by_date.sql`. It returns every show of the date, one row per show (first table below), and the grouped view of the theatre page, which leaves out shows that have already started. "Today" is the date in India.
 
 ```sql
 SELECT m.title AS movie, m.certificate, ms.language, ms.format,
        GROUP_CONCAT(TIME_FORMAT(ms.start_time, '%h:%i %p')
-                    ORDER BY ms.start_time SEPARATOR ', ') AS show_timings
+                    ORDER BY ms.start_time SEPARATOR ', ') AS show_timings,
+       GROUP_CONCAT(ms.show_id
+                    ORDER BY ms.start_time SEPARATOR ', ') AS show_ids
 FROM screen sc
 JOIN movie_show ms ON ms.screen_id = sc.screen_id
                   AND ms.show_date = @show_date
 JOIN movie      m  ON m.movie_id   = ms.movie_id
 WHERE sc.theatre_id = @theatre_id
+  AND TIMESTAMP(ms.show_date, ms.start_time) > UTC_TIMESTAMP() + INTERVAL 330 MINUTE
 GROUP BY m.movie_id, m.title, m.certificate, ms.language, ms.format
 ORDER BY m.title, ms.language, ms.format;
 ```
 
-Output for theatre 1 (Aurora Cineplex), 2026-11-27:
+Grouped output for theatre 1 (Aurora Cineplex), 2026-11-28 (`show_ids` follows the order of the timings):
 
-| movie | certificate | language | format | show_timings |
-|---|---|---|---|---|
-| Chai and Chaos | U | Hindi | 2D | 01:15 PM |
-| Midnight Ledger | A | English | 2D | 08:45 PM |
-| Orbit of Silence | UA | English | IMAX | 10:00 AM, 06:30 PM |
-| Orbit of Silence | UA | Hindi | 3D | 02:00 PM |
-| The Last Monsoon | UA | Hindi | 2D | 09:30 AM, 05:00 PM, 09:15 PM |
+| movie | certificate | language | format | show_timings | show_ids |
+|---|---|---|---|---|---|
+| Chai and Chaos | U | Hindi | 2D | 01:15 PM | 13 |
+| Midnight Ledger | A | English | 2D | 08:45 PM | 15 |
+| Orbit of Silence | UA | English | IMAX | 10:00 AM, 06:30 PM | 16, 18 |
+| Orbit of Silence | UA | Hindi | 3D | 02:00 PM | 17 |
+| The Last Monsoon | UA | Hindi | 2D | 09:30 AM, 05:00 PM, 09:15 PM | 12, 14, 19 |
 
-The same script also returns one row per show, with screen, end time and seats available:
+One row per show, for the same theatre and date (all open for booking). Seats whose hold has timed out count as available.
 
 | movie | language | format | screen | start | end | seats available |
 |---|---|---|---|---|---|---|
@@ -537,11 +520,11 @@ The same script also returns one row per show, with screen, end time and seats a
 | The Last Monsoon | Hindi | 2D | Screen 1 | 05:00 PM | 07:22 PM | 14 |
 | The Last Monsoon | Hindi | 2D | Screen 2 | 09:15 PM | 11:37 PM | 18 |
 
-A third query lists the dates, among today and the next 6 days, that have shows (the date picker).
+A third query, the date picker, always lists today and the next 6 days with the number of shows on each.
 
 ## 9. Verification
 
-Run on MySQL 8.4.13 in Docker. The four SQL files run in order without errors, including with `sql_safe_updates` on. The concurrency checks used parallel `mysql` clients. They are small functional checks, not a load test.
+Run on MySQL 8.4.13 in Docker. The four SQL files run in order without errors, including with `sql_safe_updates` on and the server time zone set to -11:00. The concurrency checks used parallel `mysql` clients. They are small functional checks, not a load test.
 
 | Check | Result |
 |---|---|
@@ -550,7 +533,12 @@ Run on MySQL 8.4.13 in Docker. The four SQL files run in order without errors, i
 | 100 parallel 2-seat holds on 18 seats | 8 held, 92 rejected; 16 seats claimed; none owned twice |
 | 100 parallel holds on one seat | 1 held, 99 rejected |
 | One webhook delivered 30 times in parallel | 1 CONFIRMED, 29 DUPLICATE_EVENT; 1 payment row |
-| Payment racing the expiry sweeper, 18 trials | 5 CONFIRMED, 13 CONFIRMED_LATE; every paid booking kept its seat |
+| Payment racing the expiry sweeper, 18 trials | 9 CONFIRMED, 9 CONFIRMED_LATE; every paid booking kept its seat |
+| Late payment racing a new hold on the same seat, 18 trials | 9 payments confirmed (rival rejected), 9 rivals held (payment marked for refund) |
+| Hold taken at -05:00, sweeper run at +05:30 | stayed PENDING with 10 minutes left |
+| Hold and late payment on a started show | SHOW_CLOSED; REFUND_REQUIRED |
+| Procedures with autocommit off, and with a caller transaction open | work after a commit; error 1568 with pending work left intact |
+| Invalid seat lists (null, text, decimal, negative, object, 11 seats) | INVALID_REQUEST |
 | Refund, failure, wrong amount, reused key and other branches | results as in section 6.7 |
 | Invariants after all tests | 0 violations |
 | Deadlocks during all tests | 0 |
@@ -568,6 +556,8 @@ The sweeper's search uses `idx_booking_expiry` (range), and the seat claim reach
 ## 10. Limitations
 
 - The schema does not prevent two shows on one screen from overlapping; only identical start times are rejected. A trigger or scheduling service should check this.
-- "A claim belongs to the same show as its booking" is enforced by the procedures, not by a constraint (section 3.4). Application accounts should be allowed to execute the procedures only, not to write these tables.
+- The schema also does not enforce that a seat in `show_seat` or `booking_seat` belongs to the show's screen, or that an IMAX-format show is on an IMAX screen.
+- The category list is declared twice (`seat` and `show_price`) and must be changed in both.
+- "A claim belongs to the same show as its booking" is enforced by the procedures, not by a constraint (section 3.3). Application accounts should be allowed to execute the procedures only, not to write these tables.
 - A show's inventory is created by the seed script; a real system needs a procedure run when a show is published.
 - Redis, the waiting room, the refund job and the load test are designs only.
