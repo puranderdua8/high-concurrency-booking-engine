@@ -36,9 +36,3 @@ cat sql/0*.sql | docker exec -i booking-mysql mysql -uroot --table
 ## What is implemented
 
 Schema, sample data, queries and the locking logic run in MySQL. The Redis seat gate, burst handling and load test are written designs only.
-
-## Rebuilding the PDF
-
-```bash
-sh docs/build_pdf.sh
-```
