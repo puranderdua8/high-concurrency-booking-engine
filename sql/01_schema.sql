@@ -94,13 +94,14 @@ CREATE TABLE customer (
 ) ENGINE=InnoDB;
 
 -- 8. One checkout attempt for one show. A PENDING booking is a timed hold.
+--    All DATETIME columns from here on are UTC, whatever the session time zone.
 CREATE TABLE booking (
     booking_id       BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     customer_id      BIGINT UNSIGNED NOT NULL,
     show_id          INT UNSIGNED    NOT NULL,
     status           ENUM('PENDING','CONFIRMED','EXPIRED','CANCELLED') NOT NULL DEFAULT 'PENDING',
     idempotency_key  CHAR(36)        NOT NULL,
-    created_at       DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    created_at       DATETIME(3)     NOT NULL DEFAULT (UTC_TIMESTAMP(3)),
     expires_at       DATETIME(3)     NOT NULL,
     confirmed_at     DATETIME(3)     NULL,
     PRIMARY KEY (booking_id),
@@ -155,7 +156,7 @@ CREATE TABLE payment (
     amount               DECIMAL(10,2)   NOT NULL,
     status               ENUM('INITIATED','SUCCEEDED','FAILED','REFUND_PENDING','REFUNDED')
                          NOT NULL DEFAULT 'INITIATED',
-    created_at           DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    created_at           DATETIME(3)     NOT NULL DEFAULT (UTC_TIMESTAMP(3)),
     PRIMARY KEY (payment_id),
     UNIQUE KEY uq_payment_provider_ref (provider, provider_payment_id),
     KEY idx_payment_booking (booking_id),
@@ -170,7 +171,7 @@ CREATE TABLE webhook_event (
     provider_payment_id  VARCHAR(100) NULL,
     event_type           VARCHAR(50)  NOT NULL,
     payload              JSON         NOT NULL,
-    received_at          DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    received_at          DATETIME(3)  NOT NULL DEFAULT (UTC_TIMESTAMP(3)),
     processed_at         DATETIME(3)  NULL,
     PRIMARY KEY (provider, provider_event_id),
     KEY idx_webhook_payment (provider, provider_payment_id),

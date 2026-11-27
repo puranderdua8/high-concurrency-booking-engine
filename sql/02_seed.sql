@@ -1,9 +1,12 @@
 -- Sample data. Run after 01_schema.sql, once, on an empty schema.
--- All names are fictional. Show dates are relative to CURDATE(), so the
--- 7-day window is always populated on the day you run this.
+-- All names are fictional. Show dates are relative to today in India (IST),
+-- so the 7-day window is always populated on the day you run this.
 
 USE booking_engine;
 SET SESSION sql_safe_updates = 0;  -- MySQL Workbench turns this on
+
+-- Theatres are in India: show dates and times are IST (UTC+05:30).
+SET @today := DATE(UTC_TIMESTAMP() + INTERVAL 330 MINUTE);
 
 START TRANSACTION;
 
@@ -40,10 +43,10 @@ CROSS JOIN n
 ORDER BY s.screen_id, r.row_label, n.seat_number;
 
 INSERT INTO movie (movie_id, title, duration_min, certificate, release_date) VALUES
-    (1, 'The Last Monsoon', 142, 'UA', CURDATE() - INTERVAL 14 DAY),
-    (2, 'Orbit of Silence', 128, 'UA', CURDATE() - INTERVAL 7 DAY),
-    (3, 'Chai and Chaos',   118, 'U',  CURDATE() - INTERVAL 21 DAY),
-    (4, 'Midnight Ledger',  135, 'A',  CURDATE() - INTERVAL 3 DAY);
+    (1, 'The Last Monsoon', 142, 'UA', @today - INTERVAL 14 DAY),
+    (2, 'Orbit of Silence', 128, 'UA', @today - INTERVAL 7 DAY),
+    (3, 'Chai and Chaos',   118, 'U',  @today - INTERVAL 21 DAY),
+    (4, 'Midnight Ledger',  135, 'A',  @today - INTERVAL 3 DAY);
 
 -- The same daily timetable repeated for today and the next 6 days.
 INSERT INTO movie_show (screen_id, movie_id, language, format, show_date, start_time)
@@ -66,7 +69,7 @@ timetable (screen_id, movie_id, language, format, start_time) AS (
     UNION ALL SELECT 3, 1, 'Tamil',   '2D',   '19:00:00'
 )
 SELECT t.screen_id, t.movie_id, t.language, t.format,
-       CURDATE() + INTERVAL d.day_offset DAY,
+       @today + INTERVAL d.day_offset DAY,
        t.start_time
 FROM d
 CROSS JOIN timetable t
@@ -98,19 +101,19 @@ INSERT INTO customer (customer_id, name, email, phone) VALUES
     (3, 'Neha Iyer',    'neha.iyer@example.com',    '+91-90000-00003'),
     (4, 'Imran Qureshi','imran.qureshi@example.com','+91-90000-00004');
 
--- Three bookings on today's 17:00 show in Screen 1.
+-- Three bookings on tomorrow's 17:00 show in Screen 1.
 SET @show_id := (SELECT show_id FROM movie_show
-                 WHERE screen_id = 1 AND show_date = CURDATE() AND start_time = '17:00:00');
+                 WHERE screen_id = 1 AND show_date = @today + INTERVAL 1 DAY AND start_time = '17:00:00');
 
 INSERT INTO booking
     (booking_id, customer_id, show_id, status, idempotency_key, created_at, expires_at, confirmed_at)
 VALUES
     (1, 1, @show_id, 'CONFIRMED', '6f1c2a10-0001-4c8e-9a11-000000000001',
-        NOW(3) - INTERVAL 60 MINUTE, NOW(3) - INTERVAL 50 MINUTE, NOW(3) - INTERVAL 57 MINUTE),
+        UTC_TIMESTAMP(3) - INTERVAL 60 MINUTE, UTC_TIMESTAMP(3) - INTERVAL 50 MINUTE, UTC_TIMESTAMP(3) - INTERVAL 57 MINUTE),
     (2, 2, @show_id, 'PENDING',   '6f1c2a10-0002-4c8e-9a11-000000000002',
-        NOW(3), NOW(3) + INTERVAL 10 MINUTE, NULL),
+        UTC_TIMESTAMP(3), UTC_TIMESTAMP(3) + INTERVAL 10 MINUTE, NULL),
     (3, 3, @show_id, 'EXPIRED',   '6f1c2a10-0003-4c8e-9a11-000000000003',
-        NOW(3) - INTERVAL 30 MINUTE, NOW(3) - INTERVAL 20 MINUTE, NULL);
+        UTC_TIMESTAMP(3) - INTERVAL 30 MINUTE, UTC_TIMESTAMP(3) - INTERVAL 20 MINUTE, NULL);
 
 -- booking 1: B2, B3 | booking 2: C1, C2 | booking 3: A1 (released)
 INSERT INTO booking_seat (booking_id, seat_id, price_paid)
@@ -152,9 +155,9 @@ INSERT INTO webhook_event
     (provider, provider_event_id, provider_payment_id, event_type, payload, processed_at)
 VALUES
     ('demopay', 'evt_0001', 'pay_0001', 'payment.succeeded',
-        JSON_OBJECT('booking_id', 1, 'payment_id', 'pay_0001'), NOW(3)),
+        JSON_OBJECT('booking_id', 1, 'payment_id', 'pay_0001'), UTC_TIMESTAMP(3)),
     ('demopay', 'evt_0002', 'pay_0002', 'payment.failed',
-        JSON_OBJECT('booking_id', 3, 'payment_id', 'pay_0002'), NOW(3));
+        JSON_OBJECT('booking_id', 3, 'payment_id', 'pay_0002'), UTC_TIMESTAMP(3));
 
 COMMIT;
 
